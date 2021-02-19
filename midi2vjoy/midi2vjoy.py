@@ -110,10 +110,10 @@ def joystick_run():
 		vjoyregkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{8E31F76F-74C3-47F1-9550-E041EEDC5FBB}_is1')
 		installpath = winreg.QueryValueEx(vjoyregkey, 'InstallLocation')
 		winreg.CloseKey(vjoyregkey)
-		#print(installpath[0])
+		print(installpath[0])
 		dll_file = os.path.join(installpath[0], 'x64', 'vJoyInterface.dll')
 		vjoy = ctypes.WinDLL(dll_file)
-		#print(vjoy.GetvJoyVersion())
+		print(vjoy.GetvJoyVersion())
 		
 		# Getting ready
 		for vid in vids:
@@ -137,29 +137,41 @@ def joystick_run():
 				key = tuple(ipt[0][0][0:2])
 				reading = ipt[0][0][2]
 				# Check that the input is defined in table
-				print(key, reading)
+				#print(key, reading)
 				if not key in table:
 					continue
 				opt = table[key]
 				if options.verbose:
 					print(key, '->', opt, reading)
-				if key[0] == 176:
-					# A slider input
-					# Check that the output axis is valid
-					# Note: We did not check if that axis is defined in vJoy
-					if not opt[1] in axis:
+				if key[0] == 191:
+					# Type 191 CC 14,15,23,24 are treated each 
+					# as a pair of buttons opt[0] and opt[0]+1 
+					# depending on the reading <> 64
+					if key[1] in {14, 15, 23, 24}:
+						if reading < 64:
+							# A button press + release opt[1]
+							vjoy.SetBtn(127, opt[0], int(opt[1]))
+							time.sleep(0.01)
+							vjoy.SetBtn(0, opt[0], int(opt[1]))
+						else:
+							# A button press + release opt[1]+1
+							vjoy.SetBtn(127, opt[0], int(opt[1])+1)
+							time.sleep(0.01)
+							vjoy.SetBtn(0, opt[0], int(opt[1])+1)
+					elif not opt[1] in axis:
 						continue
-					reading = (reading + 1) << 8
-					vjoy.SetAxis(reading, opt[0], axis[opt[1]])
-				elif key[0] == 144:
+					else:
+						# A slider input
+						# Check that the output axis is valid
+						# Note: We did not check if that axis is defined in vJoy
+						reading = (reading + 1) << 8
+						vjoy.SetAxis(reading, opt[0], axis[opt[1]])
+				elif key[0] == 159:
 					# A button input
-					vjoy.SetBtn(reading, opt[0], int(opt[1]))
-				elif key[0] == 128:
-					# A button off input
 					vjoy.SetBtn(reading, opt[0], int(opt[1]))
 			time.sleep(0.1)
 	except:
-		#traceback.print_exc()
+		traceback.print_exc()
 		pass
 		
 	# Relinquish vJoysticks
